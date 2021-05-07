@@ -21,3 +21,6 @@
 [submodule "scylla-python3"]
 	path = tools/python3
 	url = https://github.com/scylladb/scylla-python3
+[submodule "picojson"]
+	path = picojson
+	url = https://github.com/kazuho/picojson.git
