@@ -6,6 +6,11 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
+/*
+ * Modified by Criteo: June 2021
+ */
+
+
 #include <seastar/core/coroutine.hh>
 #include "auth/service.hh"
 
@@ -128,6 +133,9 @@ service::service(
                       create_object<authorizer>(sc.authorizer_java_name, qp, mm),
                       create_object<authenticator>(sc.authenticator_java_name, qp, mm),
                       create_object<role_manager>(sc.role_manager_java_name, qp, mm)) {
+    // authenticator_config pass via a setter instead of constructor to ease maintenance of our fork
+    // by reducing number of modified lines
+    _authenticator->set_authenticator_config(authenticator_config(sc.authenticator_config));
 }
 
 future<> service::create_keyspace_if_missing(::service::migration_manager& mm) const {

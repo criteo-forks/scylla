@@ -7,6 +7,10 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
+/*
+ * Modified by Criteo: June 2021
+ */
+
 #pragma once
 
 #include <boost/program_options.hpp>
@@ -366,6 +370,12 @@ public:
     named_value<tri_mode_restriction> restrict_dtcs;
 
     seastar::logging_settings logging_settings(const log_cli::options&) const;
+
+    named_value<sstring> rest_authenticator_endpoint_host;
+    named_value<uint16_t> rest_authenticator_endpoint_port;
+    named_value<sstring> rest_authenticator_endpoint_cafile_path;
+    named_value<uint32_t> rest_authenticator_endpoint_ttl;
+    named_value<uint32_t> rest_authenticator_endpoint_timeout;
 
     const db::extensions& extensions() const;
 
