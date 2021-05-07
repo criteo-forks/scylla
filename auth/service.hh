@@ -6,6 +6,10 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
+/*
+ * Modified by Criteo: June 2021
+ */
+
 #pragma once
 
 #include <string_view>
@@ -42,6 +46,7 @@ struct service_config final {
     sstring authorizer_java_name;
     sstring authenticator_java_name;
     sstring role_manager_java_name;
+    authenticator_config authenticator_config;
 };
 
 ///

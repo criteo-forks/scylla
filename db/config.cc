@@ -7,6 +7,10 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
+/*
+ * Modified by Criteo: June 2021
+ */
+
 #include <unordered_map>
 #include <regex>
 #include <sstream>
@@ -697,8 +701,9 @@ db::config::config(std::shared_ptr<db::extensions> exts)
         "\torg.apache.cassandra.auth.AllowAllAuthenticator : Disables authentication; no checks are performed.\n"
         "\torg.apache.cassandra.auth.PasswordAuthenticator : Authenticates users with user names and hashed passwords stored in the system_auth.credentials table. If you use the default, 1, and the node with the lone replica goes down, you will not be able to log into the cluster because the system_auth keyspace was not replicated.\n"
         "\tcom.scylladb.auth.TransitionalAuthenticator : Wraps around the PasswordAuthenticator, logging them in if username/password pair provided is correct and treating them as anonymous users otherwise.\n"
+        "\tcom.criteo.scylladb.auth.RestAuthenticator : Call an external rest endpoints to authenticate user.\n"
         "Related information: Internal authentication"
-        , {"AllowAllAuthenticator", "PasswordAuthenticator", "org.apache.cassandra.auth.PasswordAuthenticator", "org.apache.cassandra.auth.AllowAllAuthenticator", "com.scylladb.auth.TransitionalAuthenticator"})
+        , {"AllowAllAuthenticator", "PasswordAuthenticator", "org.apache.cassandra.auth.PasswordAuthenticator", "org.apache.cassandra.auth.AllowAllAuthenticator", "com.scylladb.auth.TransitionalAuthenticator", "com.criteo.scylladb.auth.RestAuthenticator"})
     , internode_authenticator(this, "internode_authenticator", value_status::Unused, "enabled",
         "Internode authentication backend. It implements org.apache.cassandra.auth.AllowAllInternodeAuthenticator to allows or disallow connections from peer nodes.")
     , authorizer(this, "authorizer", value_status::Used, "org.apache.cassandra.auth.AllowAllAuthorizer",
@@ -883,6 +888,14 @@ db::config::config(std::shared_ptr<db::extensions> exts)
     , restrict_dtcs(this, "restrict_dtcs", liveness::LiveUpdate, value_status::Used, db::tri_mode_restriction_t::mode::WARN, "Controls whether to prevent setting DateTieredCompactionStrategy. Can be true, false, or warn.")
     , cache_index_pages(this, "cache_index_pages", liveness::LiveUpdate, value_status::Used, true,
         "Keep SSTable index pages in the global cache after a SSTable read. Expected to improve performance for workloads with big partitions, but may degrade performance for workloads with small partitions.")
+
+    // REST AUTHENTICATOR
+    , rest_authenticator_endpoint_host(this, "rest_authenticator_endpoint_host", value_status::Used, "localhost", "Host to contact the external rest endpoint used to authenticate users.")
+    , rest_authenticator_endpoint_port(this, "rest_authenticator_endpoint_port", value_status::Used, 443, "Port to contact the external rest endpoint used to authenticate users.")
+    , rest_authenticator_endpoint_cafile_path(this, "rest_authenticator_endpoint_cafile_path", value_status::Used, "", "Path to the file containing the CA to trust to contact the external authenticator rest endpoint.")
+    , rest_authenticator_endpoint_ttl(this, "rest_authenticator_endpoint_ttl", value_status::Used, 86400, "TTL used to define how many time user roles from rest endpoint authenticator should be kept.")
+    , rest_authenticator_endpoint_timeout(this, "rest_authenticator_endpoint_timeout", value_status::Used, 5, "Duration (in second) before to timeout when calling rest auth endpoint.")
+
     , default_log_level(this, "default_log_level", value_status::Used)
     , logger_log_level(this, "logger_log_level", value_status::Used)
     , log_to_stdout(this, "log_to_stdout", value_status::Used)
