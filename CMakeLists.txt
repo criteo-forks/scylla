@@ -165,6 +165,12 @@ seastar_generate_ragel(
     IN_FILE redis/protocol_parser.rl
     OUT_FILE ${scylla_gen_build_dir}/redis/protocol_parser.hh)
 
+seastar_generate_ragel(
+    TARGET scylla_ragel_http_response_parser
+    VAR http_response_parser_file
+    IN_FILE auth/rest_response_parser.rl
+    OUT_FILE ${scylla_gen_build_dir}/auth/rest_response_parser.hh)
+
 # Generate C++ sources from Swagger definitions
 set(swagger_files
     api/api-doc/cache_service.json
@@ -303,6 +309,7 @@ set(scylla_sources
     auth/common.cc
     auth/default_authorizer.cc
     auth/password_authenticator.cc
+    auth/rest_authenticator.cc
     auth/passwords.cc
     auth/permission.cc
     auth/permissions_cache.cc
@@ -713,6 +720,7 @@ target_compile_options(crc_combine_table PRIVATE
     -fcoroutines
     ${target_arch_flag})
 add_dependencies(scylla crc_combine_table)
+add_dependencies(scylla scylla_ragel_http_response_parser)
 
 # Generate an additional source file at build time that is needed for Scylla compilation
 add_custom_command(OUTPUT "${scylla_gen_build_dir}/utils/gz/crc_combine_table.cc"

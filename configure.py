@@ -21,6 +21,10 @@
 # along with Scylla.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+#
+# Modified by Criteo: June 2021
+#
+
 import argparse
 import os
 import platform
@@ -373,6 +377,7 @@ scylla_tests = set([
     'test/boost/range_tombstone_list_test',
     'test/boost/reusable_buffer_test',
     'test/boost/restrictions_test',
+    'test/boost/rest_authenticator_test',
     'test/boost/role_manager_test',
     'test/boost/row_cache_test',
     'test/boost/schema_change_test',
@@ -823,6 +828,8 @@ scylla_core = (['database.cc',
                 'auth/roles-metadata.cc',
                 'auth/passwords.cc',
                 'auth/password_authenticator.cc',
+                'auth/rest_authenticator.cc',
+                'auth/rest_response_parser.rl',
                 'auth/permission.cc',
                 'auth/permissions_cache.cc',
                 'auth/service.cc',
@@ -965,6 +972,7 @@ scylla_tests_generic_dependencies = [
     'test/lib/test_utils.cc',
     'test/lib/tmpdir.cc',
     'test/lib/sstable_run_based_compaction_strategy_for_tests.cc',
+    'alternator/base64.cc',
 ]
 
 scylla_tests_dependencies = scylla_core + idls + scylla_tests_generic_dependencies + [
@@ -1107,7 +1115,6 @@ deps['test/boost/linearizing_input_stream_test'] = [
 ]
 
 deps['test/boost/duration_test'] += ['test/lib/exception_utils.cc']
-deps['test/boost/alternator_base64_test'] += ['alternator/base64.cc']
 
 deps['test/raft/replication_test'] = ['test/raft/replication_test.cc'] + scylla_raft_dependencies
 deps['test/boost/raft_fsm_test'] =  ['test/boost/raft_fsm_test.cc', 'test/lib/log.cc'] + scylla_raft_dependencies
