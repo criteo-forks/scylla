@@ -39,6 +39,10 @@
  * along with Scylla.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/*
+ * Modified by Criteo: June 2021
+ */
+
 #pragma once
 
 #include <string_view>
@@ -67,6 +71,14 @@ namespace db {
 namespace auth {
 
 class authenticated_user;
+
+struct authenticator_config {
+    sstring rest_authenticator_endpoint_host;
+    uint16_t rest_authenticator_endpoint_port;
+    sstring rest_authenticator_endpoint_cafile_path;
+    uint32_t rest_authenticator_endpoint_ttl;
+    uint32_t rest_authenticator_endpoint_timeout;
+};
 
 ///
 /// Abstract client for authenticating role identity.
@@ -151,6 +163,13 @@ public:
     virtual const resource_set& protected_resources() const = 0;
 
     virtual ::shared_ptr<sasl_challenge> new_sasl_challenge() const = 0;
+
+    virtual void set_authenticator_config(const authenticator_config &ac) { _authenticator_config = ac; }
+
+    virtual const authenticator_config & get_authenticator_config() const { return _authenticator_config; }
+
+protected:
+    authenticator_config _authenticator_config;
 };
 
 }

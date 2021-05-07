@@ -20,6 +20,10 @@
  * along with Scylla.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/*
+ * Modified by Criteo: June 2021
+ */
+
 #pragma once
 
 #include <boost/program_options.hpp>
@@ -340,6 +344,12 @@ public:
     named_value<sstring> redis_write_consistency_level;
     named_value<uint16_t> redis_database_count;
     named_value<string_map> redis_keyspace_replication_strategy_options;
+
+    named_value<sstring> rest_authenticator_endpoint_host;
+    named_value<uint16_t> rest_authenticator_endpoint_port;
+    named_value<sstring> rest_authenticator_endpoint_cafile_path;
+    named_value<uint32_t> rest_authenticator_endpoint_ttl;
+    named_value<uint32_t> rest_authenticator_endpoint_timeout;
 
     seastar::logging_settings logging_settings(const boost::program_options::variables_map&) const;
 
