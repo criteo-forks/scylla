@@ -26,6 +26,7 @@
 #include <seastar/core/future-util.hh>
 #include "picojson/picojson.h"
 #include "auth/rest_response_parser.hh"
+#include "auth/role_manager.hh"
 #include "alternator/base64.hh"
 
 
@@ -53,7 +54,7 @@ namespace auth {
             rest_response_parser _parser;
             sstring _request;
 
-            future <std::vector<std::string>> extract_groups(temporary_buffer<char> buf, uint content_len) {
+            future <role_set> extract_groups(temporary_buffer<char> buf, uint content_len) {
                 const char *json = buf.get();
                 picojson::value v;
                 std::string err;
@@ -83,20 +84,20 @@ namespace auth {
                 }
 
                 const picojson::value::array &p_groups = pv_groups.get<picojson::array>();
-                std::vector <std::string> groups;
 
+                role_set groups;
                 // TODO filter groups to add (For ex. only add groups containing scylla... to avoid storing all groups)
                 for (auto p_group : p_groups) {
                     if (p_group.is<std::string>()) {
                         auto group = p_group.get<std::string>();
-                        groups.push_back(group);
+                        groups.insert(sstring(group));
                     }
                 }
 
-                return make_ready_future < std::vector < std::string >> (groups);
+                return make_ready_future<role_set>(groups);
             }
 
-            future <std::vector<std::string>>
+            future <role_set>
             get_groups_from_body(std::unique_ptr <auth::http_response, std::default_delete<auth::http_response>> rsp) {
                 auto it = rsp->_headers.find("content-length");
                 if (it == rsp->_headers.end()) {
@@ -125,7 +126,7 @@ namespace auth {
 
             ~connection() {}
 
-            future <std::vector<std::string>> do_get_groups(sstring username, sstring password) {
+            future <role_set> do_get_groups(sstring username, sstring password) {
                 std::string b64_authorization = get_authorization_header(username, password);
                 sstring request = format(_request.c_str(), b64_authorization);
 
@@ -173,7 +174,8 @@ namespace auth {
                               _server, _port);
 
             // Load system CA trust
-            // TODO see tls.credentials_builder in Seastar
+            // TODO see tls.credentials_builder in Seastar in order to create
+            // a reloadable creds: tls::credentials_builder::build_reloadable_server_credentials
             auto f = _creds->set_system_trust();
             if (_ca_file != "") {
                 f = f.then([this] { return _creds->set_x509_trust_file(_ca_file, tls::x509_crt_format::PEM); });
