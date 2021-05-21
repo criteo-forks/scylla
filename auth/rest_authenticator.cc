@@ -97,7 +97,7 @@ namespace auth {
 
     static const sstring &create_row_query_roles() {
         static const sstring create_row_query_roles = format(
-                "INSERT INTO {} ({}, can_login, is_superuser, member_of, {}) VALUES (?, true, false, {{}}, ?)",
+                "INSERT INTO {} ({}, can_login, is_superuser, {}) VALUES (?, true, false, ?)",
                 meta::roles_table::qualified_name,
                 meta::roles_table::role_col_name,
                 SALTED_HASH);
@@ -137,7 +137,7 @@ namespace auth {
         // Ensure the _authenticator_config has been well initialized
         if (_authenticator_config.rest_authenticator_endpoint_host == "") {
             throw std::invalid_argument("Missing configuration for rest_authenticator_endpoint_host. "
-                                        "Did you call set_authenticator_config before calling start?" );
+                                        "Did you call set_authenticator_config before calling start?");
         }
         // Init rest http client
         _rest_http_client = rest_http_client(_authenticator_config.rest_authenticator_endpoint_host,
@@ -266,8 +266,10 @@ namespace auth {
 
                 // If not super user (super user is local only) and the username is not in roles_valid or salted_hash empty or bad password
                 // call external endpoint
-                if ((username != DEFAULT_USER_NAME && !role_name) || !salted_hash ||
-                    !passwords::check(password, *salted_hash)) {
+                if (username == DEFAULT_USER_NAME && (!salted_hash || !passwords::check(password, *salted_hash))) {
+                    std::throw_with_nested(exceptions::authentication_exception("Bad password for superuser"));
+                } else if (username != DEFAULT_USER_NAME &&
+                           (!role_name || !salted_hash || !passwords::check(password, *salted_hash))) {
                     bool create_user = res_roles->empty();
 
                     // TODO manage retry?
@@ -278,20 +280,18 @@ namespace auth {
                     return with_timeout(
                             timer<>::clock::now() +
                             std::chrono::seconds(_authenticator_config.rest_authenticator_endpoint_timeout),
-                            _rest_http_client.connect()
-                                    .then([username, password](
-                                            std::unique_ptr <rest_http_client::connection> c) {
-                                        return seastar::do_with(
-                                                std::move(c),
-                                                [username, password](auto &c) {
-                                                    return c->do_get_groups(username, password);
-                                                });
-                                    })
-                                    .then([this, create_user, username, password](
-                                            std::vector <std::string> groups) {
-                                        return create_or_update(create_user, username, password, groups);
-                                    })
-                    );
+                            _rest_http_client.connect())
+                            .then([username, password](
+                                    std::unique_ptr <rest_http_client::connection> c) {
+                                return seastar::do_with(
+                                        std::move(c),
+                                        [username, password](auto &c) {
+                                            return c->do_get_groups(username, password);
+                                        });
+                            })
+                            .then([this, create_user, username, password](role_set roles) {
+                                return create_or_update(create_user, username, password, roles);
+                            });
                 }
 
                 return make_ready_future<authenticated_user>(username);
@@ -308,29 +308,30 @@ namespace auth {
     }
 
     future <authenticated_user>
-    rest_authenticator::create_or_update(bool create_user, sstring username, sstring password,
-                                         std::vector <std::string> groups) const {
-        authentication_options authen_options;
-        authen_options.password = std::optional < std::string > {password};
+    rest_authenticator::create_or_update(bool create_user, sstring username, sstring password, role_set &roles) const {
+        return do_with(std::move(roles), [this, create_user, username, password](role_set &roles) {
+            authentication_options authen_options;
+            authen_options.password = std::optional < std::string > {password};
 
-        if (create_user) {
-            plogger.info("Create role for username {}", username);
-            return rest_authenticator::create_with_groups(username, groups, authen_options).then([username] {
+            if (create_user) {
+                plogger.info("Create role for username {}", username);
+                return rest_authenticator::create_with_groups(username, roles, authen_options).then([username] {
+                    return make_ready_future<authenticated_user>(username);
+                });
+            }
+            plogger.info("Update password for username {}", username);
+            return rest_authenticator::alter_with_groups(username, roles, authen_options).then([username] {
                 return make_ready_future<authenticated_user>(username);
             });
-        }
-        plogger.info("Update password for username {}", username);
-        return rest_authenticator::alter_with_groups(username, groups, authen_options).then([username] {
-            return make_ready_future<authenticated_user>(username);
         });
     }
 
     future<> rest_authenticator::create(std::string_view role_name, const authentication_options &options) const {
-        std::vector <std::string> groups;
-        return create_with_groups(sstring(role_name), groups, options);
+        role_set roles;
+        return create_with_groups(sstring(role_name), roles, options);
     }
 
-    future<> rest_authenticator::create_with_groups(sstring role_name, std::vector <std::string> groups,
+    future<> rest_authenticator::create_with_groups(sstring role_name, role_set &roles,
                                                     const authentication_options &options) const {
         if (!options.password) {
             return make_ready_future<>();
@@ -347,15 +348,17 @@ namespace auth {
                         consistency_for_user(role_name),
                         internal_distributed_timeout_config(),
                         {role_name})
-        ).discard_result();
+        ).then([this, role_name, &roles](auto f) {
+            return modify_membership(role_name, roles);
+        }).discard_result();
     }
 
     future<> rest_authenticator::alter(std::string_view role_name, const authentication_options &options) const {
-        std::vector <std::string> groups;
-        return alter_with_groups(sstring(role_name), groups, options);
+        role_set roles;
+        return alter_with_groups(sstring(role_name), roles, options);
     }
 
-    future<> rest_authenticator::alter_with_groups(sstring role_name, std::vector <std::string> groups,
+    future<> rest_authenticator::alter_with_groups(sstring role_name, role_set &roles,
                                                    const authentication_options &options) const {
         if (!options.password) {
             return make_ready_future<>();
@@ -377,7 +380,9 @@ namespace auth {
                         consistency_for_user(role_name),
                         internal_distributed_timeout_config(),
                         {role_name})
-        ).discard_result();
+        ).then([this, role_name, &roles](auto f) {
+            return modify_membership(role_name, roles);
+        }).discard_result();
     }
 
     future<> rest_authenticator::drop(std::string_view name) const {
@@ -390,6 +395,25 @@ namespace auth {
                 query, consistency_for_user(name),
                 internal_distributed_timeout_config(),
                 {sstring(name)}).discard_result();
+    }
+
+
+    future<>
+    rest_authenticator::modify_membership(sstring grantee_name, role_set &roles) const {
+        const auto modify_roles = [this, grantee_name, &roles] {
+            const auto query = format(
+                    "UPDATE {} SET member_of = ? WHERE {} = ?",
+                    meta::roles_table::qualified_name,
+                    meta::roles_table::role_col_name);
+
+            return _qp.execute_internal(
+                    query,
+                    consistency_for_user(grantee_name),
+                    internal_distributed_timeout_config(),
+                    {roles, grantee_name});
+        };
+
+        return modify_roles().discard_result();
     }
 
     future <custom_options> rest_authenticator::query_custom_options(std::string_view role_name) const {

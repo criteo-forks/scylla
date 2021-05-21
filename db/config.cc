@@ -656,6 +656,7 @@ db::config::config(std::shared_ptr<db::extensions> exts)
     , role_manager(this, "role_manager", value_status::Used, "org.apache.cassandra.auth.CassandraRoleManager",
         "The role-management backend, used to maintain grantts and memberships between roles.\n"
         "The available role-managers are:\n"
+        "\tcom.criteo.scylladb.auth.RestManager : Rely on roles created by rest_authenticator in the system_auth.roles table.\n"
         "\tCassandraRoleManager : Stores role data in the system_auth keyspace.")
     , permissions_validity_in_ms(this, "permissions_validity_in_ms", value_status::Used, 10000,
         "How long permissions in cache remain valid. Depending on the authorizer, such as CassandraAuthorizer, fetching permissions can be resource intensive. Permissions caching is disabled when this property is set to 0 or when AllowAllAuthorizer is used. The cached value is considered valid as long as both its value is not older than the permissions_validity_in_ms "
