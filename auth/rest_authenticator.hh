@@ -25,6 +25,7 @@
 
 #include "auth/authenticator.hh"
 #include "auth/rest_http_client.hh"
+#include "auth/role_manager.hh"
 #include "cql3/query_processor.hh"
 
 namespace service {
@@ -91,17 +92,21 @@ public:
 
 
 private:
-    future<> create_default_if_missing() const;
+
+    enum class membership_change {
+        add, remove
+    };
 
     future <authenticated_user>
-    create_or_update(bool user_to_create, sstring username, sstring password,
-                     std::vector <std::string> groups) const;
+    create_or_update(bool user_to_create, sstring username, sstring password, role_set &roles) const;
 
-    future<> create_with_groups(sstring role_name, std::vector <std::string> groups,
-                                const authentication_options &options) const;
+    future<> create_with_groups(sstring role_name, role_set &roles, const authentication_options &options) const;
 
-    future<> alter_with_groups(sstring role_name, std::vector <std::string> groups,
-                               const authentication_options &options) const;
+    future<> alter_with_groups(sstring role_name, role_set &roles, const authentication_options &options) const;
+
+    future<> modify_membership(sstring grantee_name, role_set &roles) const;
+
+    future<> create_default_if_missing() const;
 
 };
 

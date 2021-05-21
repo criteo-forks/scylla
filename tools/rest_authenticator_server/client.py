@@ -24,13 +24,47 @@
 from cassandra.cluster import Cluster
 from cassandra.auth import PlainTextAuthProvider
 
-if __name__ == '__main__':
-    auth_provider = PlainTextAuthProvider(username='scylla_user', password='not_cassandra')
+
+def contact_scylla(username='scylla_user', password='not_cassandra'):
+    print(f'Run with user {username}')
+    auth_provider = PlainTextAuthProvider(username=username, password=password)
     cluster = Cluster(auth_provider=auth_provider, protocol_version=2)
     session = cluster.connect()
+    try:
+        print('roles')
+        rows = session.execute('SELECT * FROM system_auth.roles')
+        for user_row in rows:
+            print(user_row)
 
-    session.execute("DELETE FROM system_auth.roles where role='scylla_user'")
+        print('role_members')
+        rows = session.execute('SELECT * FROM system_auth.roles_valid')
+        for user_row in rows:
+            print(user_row)
 
-    rows = session.execute('SELECT * FROM system_auth.roles')
-    for user_row in rows:
-        print(user_row)
+        if username == 'cassandra':
+            print('permissions')
+            session.execute('GRANT ALL PERMISSIONS ON system_auth.roles TO group1')
+            session.execute('GRANT ALL PERMISSIONS ON system_auth.roles_valid TO group1')
+
+        # print('Delete scylla role')
+        # session.execute("DELETE FROM system_auth.roles where role='scylla_user'")
+        # session.execute("DELETE FROM system_auth.roles_valid where role='scylla_user'")
+
+        # print('role_permissions')
+        # rows = session.execut
+        # e('SELECT * FROM system_auth.role_permissions')
+        # for user_row in rows:
+        #    print(user_row)
+
+        # print(session.execute('LIST ALL PERMISSIONS OF scylla_user;'))
+        # rows = session.execute('LIST ROLES OF scylla_user;')
+        # for user_row in rows:
+        #    print(user_row)
+    finally:
+        session.shutdown()
+
+
+if __name__ == '__main__':
+    contact_scylla(username='cassandra', password='cassandra')
+    contact_scylla()
+    contact_scylla(username='scylla_user2', password='not_cassandra')
