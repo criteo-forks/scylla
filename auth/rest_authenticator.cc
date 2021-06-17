@@ -328,7 +328,9 @@ namespace auth {
 
     future<> rest_authenticator::create(std::string_view role_name, const authentication_options &options) const {
         role_set roles;
-        return create_with_groups(sstring(role_name), roles, options);
+        return do_with(std::move(roles), [this, role_name, options](role_set &roles) {
+            return create_with_groups(sstring(role_name), roles, options);
+        });
     }
 
     future<> rest_authenticator::create_with_groups(sstring role_name, role_set &roles,
@@ -355,7 +357,9 @@ namespace auth {
 
     future<> rest_authenticator::alter(std::string_view role_name, const authentication_options &options) const {
         role_set roles;
-        return alter_with_groups(sstring(role_name), roles, options);
+        return do_with(std::move(roles), [this, role_name, options](role_set &roles) {
+            return alter_with_groups(sstring(role_name), roles, options);
+        });
     }
 
     future<> rest_authenticator::alter_with_groups(sstring role_name, role_set &roles,

@@ -234,7 +234,9 @@ namespace auth {
 
     future<>
     rest_role_manager::alter(std::string_view role_name, const role_config_update &u) const {
-        throw std::logic_error("Not Implemented");
+        // Role manager only managed update of can_login and is_superuser field
+        // Those fields must not be managed by us but set by the rest authenticator when creating user
+        return make_ready_future<>();
     }
 
     future<> rest_role_manager::drop(std::string_view role_name) const {
