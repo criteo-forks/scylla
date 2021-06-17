@@ -456,3 +456,42 @@ SEASTAR_TEST_CASE(user_password_is_updated) {
             BOOST_REQUIRE(salted_hash != salted_hash2);
         });
 }
+
+
+SEASTAR_TEST_CASE(update_superuser_password) {
+        return with_dummy_authentication_server([](cql_test_env &env) {
+            auto &qp = env.local_qp();
+            create_superuser_role(qp).get();
+
+            auto &a = env.local_auth_service().underlying_authenticator();
+
+            auto creds = auth::authenticator::credentials_map{
+                    {auth::authenticator::USERNAME_KEY, sstring("cassandra")},
+                    {auth::authenticator::PASSWORD_KEY, sstring("cassandra")}
+            };
+
+            auto auth_user = a.authenticate(creds).get();
+            BOOST_REQUIRE_EQUAL(auth_user.name.value(), "cassandra");
+            BOOST_REQUIRE(is_superuser(qp, "cassandra").get());
+
+            // Alter superuser password
+            auth::authentication_options authen_options;
+            authen_options.password = std::optional < std::string > {"123456"};
+            a.alter("cassandra", authen_options).get();
+
+            // Ensure old password doesn't work
+            BOOST_REQUIRE_EXCEPTION(a.authenticate(creds).get(), exceptions::authentication_exception,
+                                    seastar::testing::exception_predicate::message_contains(
+                                            "Bad password for superuser"));
+
+            // Ensure new password works and user rights haven't been affected
+            auto creds_new = auth::authenticator::credentials_map{
+                    {auth::authenticator::USERNAME_KEY, sstring("cassandra")},
+                    {auth::authenticator::PASSWORD_KEY, sstring("123456")}
+            };
+
+            auto auth_user_new = a.authenticate(creds_new).get();
+            BOOST_REQUIRE_EQUAL(auth_user_new.name.value(), "cassandra");
+            BOOST_REQUIRE(is_superuser(qp, "cassandra").get());
+        });
+}
