@@ -209,8 +209,12 @@ namespace auth {
     }
 
     future<bool> rest_role_manager::can_login(std::string_view role_name) const {
-        return require_record(_qp, role_name).then([](record r) {
-            return r.can_login;
+        return find_record(_qp, role_name).then([](std::optional <record> mr) {
+            if (mr) {
+                record r = *mr;
+                return r.can_login;
+            }
+            return false;
         });
     }
 
@@ -252,7 +256,32 @@ namespace auth {
     }
 
     future <role_set> rest_role_manager::query_all() const {
-        throw std::logic_error("Not Implemented");
-    }
+        static const sstring query = format("SELECT {},member_of from {}",
+                                            meta::roles_table::role_col_name,
+                                            meta::roles_table::qualified_name);
 
+        // To avoid many copies of a view.
+        static const auto role_col_name_string = sstring(meta::roles_table::role_col_name);
+        static const auto member_of_col_name_string = sstring("member_of");
+
+        return _qp.execute_internal(
+                query,
+                db::consistency_level::QUORUM,
+                internal_distributed_timeout_config()).then([](::shared_ptr <cql3::untyped_result_set> results) {
+            role_set roles;
+
+            std::for_each(
+                    results->begin(),
+                    results->end(),
+                    [&roles](const cql3::untyped_result_set_row &row) {
+                        roles.insert(row.get_as<sstring>(role_col_name_string));
+                        if (row.has(member_of_col_name_string)) {
+                            for (auto member : row.get_set<sstring>(member_of_col_name_string)) {
+                                roles.insert(member);
+                            }
+                        }
+                    });
+            return roles;
+        });
+    }
 }
