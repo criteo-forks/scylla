@@ -71,3 +71,8 @@ Run Test client
 $ ./tools/rest_authenticator_server/scylla_client.sh
 ```
 
+## UnitTest
+
+```bash
+./tools/toolchain/dbuild ninja build/debug/test/boost/rest_authenticator_test && ./tools/toolchain/dbuild ./build/debug/test/boost/rest_authenticator_test
+```

@@ -495,3 +495,29 @@ SEASTAR_TEST_CASE(update_superuser_password) {
             BOOST_REQUIRE(is_superuser(qp, "cassandra").get());
         });
 }
+
+
+SEASTAR_TEST_CASE(get_list_of_roles) {
+        return with_dummy_authentication_server([](cql_test_env &env) {
+            auto &a = env.local_auth_service().underlying_authenticator();
+            auto &rm = env.local_auth_service().underlying_role_manager();
+
+            auth::role_set roles;
+            roles.insert(sstring("tester"));
+
+            BOOST_REQUIRE_EQUAL(rm.query_all().get(), roles);
+
+            auto creds = auth::authenticator::credentials_map{
+                    {auth::authenticator::USERNAME_KEY, sstring("alice")},
+                    {auth::authenticator::PASSWORD_KEY, sstring("password")}
+            };
+
+            a.authenticate(creds).get();
+
+            roles.insert(sstring("scylla-rw"));
+            roles.insert(sstring("other"));
+            roles.insert(sstring("alice"));
+
+            BOOST_REQUIRE_EQUAL(rm.query_all().get(), roles);
+        });
+}
