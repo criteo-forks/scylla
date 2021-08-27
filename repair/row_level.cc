@@ -580,8 +580,8 @@ public:
                 auto metadata = mutation_source_metadata{};
                 auto& cs = t->get_compaction_strategy();
                 const auto adjusted_estimated_partitions = cs.adjust_partition_estimate(metadata, estimated_partitions);
-                auto consumer = cs.make_interposer_consumer(metadata,
-                        [t = std::move(t), use_view_update_path, adjusted_estimated_partitions] (flat_mutation_reader reader) {
+
+                auto consumer = [t = std::move(t), use_view_update_path, adjusted_estimated_partitions] (flat_mutation_reader reader) {
                     sstables::shared_sstable sst = use_view_update_path ? t->make_streaming_staging_sstable() : t->make_streaming_sstable_for_write();
                     schema_ptr s = reader.schema();
                     auto& pc = service::get_local_streaming_priority();
@@ -597,7 +597,7 @@ public:
                         }
                         return _view_update_generator->local().register_staging_sstable(sst, std::move(t));
                     });
-                });
+                };
                 return consumer(std::move(reader));
             });
         },
