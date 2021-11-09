@@ -128,7 +128,7 @@ static future <std::optional<record>> find_record(cql3::query_processor &qp, std
     return qp.execute_internal(
             query,
             db::consistency_level::LOCAL_ONE,
-            auth::internal_distributed_timeout_config(),
+            auth::internal_distributed_query_state(),
             {sstring(role_name)},
             true).then([](::shared_ptr <cql3::untyped_result_set> results) {
         if (results->empty()) {
@@ -196,7 +196,7 @@ static future<> delete_record_valid(cql3::query_processor &qp, std::string_view 
     return qp.execute_internal(
             query,
             db::consistency_level::LOCAL_ONE,
-            auth::internal_distributed_timeout_config(),
+            auth::internal_distributed_query_state(),
             {sstring(role_name)},
             true).discard_result();
 };
@@ -208,7 +208,7 @@ static future <std::optional<sstring>> find_record_valid(cql3::query_processor &
     return qp.execute_internal(
             query,
             db::consistency_level::LOCAL_ONE,
-            auth::internal_distributed_timeout_config(),
+            auth::internal_distributed_query_state(),
             {sstring(role_name)},
             true).then([](::shared_ptr <cql3::untyped_result_set> results) {
         if (results->empty()) {
@@ -239,7 +239,7 @@ static future<> create_superuser_role(cql3::query_processor &qp) {
     return qp.execute_internal(
             query,
             db::consistency_level::QUORUM,
-            auth::internal_distributed_timeout_config(),
+            auth::internal_distributed_query_state(),
             {auth::meta::DEFAULT_SUPERUSER_NAME,
              auth::passwords::hash(sstring(auth::meta::DEFAULT_SUPERUSER_NAME), rng_for_salt)}).discard_result();
 }
