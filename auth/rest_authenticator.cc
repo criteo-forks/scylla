@@ -123,7 +123,7 @@ namespace auth {
                 return _qp.execute_internal(
                         update_row_query(),
                         db::consistency_level::QUORUM,
-                        internal_distributed_timeout_config(),
+                        internal_distributed_query_state(),
                         {passwords::hash(DEFAULT_USER_PASSWORD, rng_for_salt), DEFAULT_USER_NAME}).then([](auto &&) {
                     plogger.info("Created default superuser authentication record.");
                 });
@@ -237,13 +237,13 @@ namespace auth {
                     _qp.execute_internal(
                             query_roles,
                             consistency_for_user(username),
-                            internal_distributed_timeout_config(),
+                            internal_distributed_query_state(),
                             {username},
                             true),
                     _qp.execute_internal(
                             query_roles_valid,
                             consistency_for_user(username),
-                            internal_distributed_timeout_config(),
+                            internal_distributed_query_state(),
                             {username},
                             true)
             );
@@ -343,12 +343,12 @@ namespace auth {
                 _qp.execute_internal(
                         create_row_query_roles(),
                         consistency_for_user(role_name),
-                        internal_distributed_timeout_config(),
+                        internal_distributed_query_state(),
                         {role_name, passwords::hash(*options.password, rng_for_salt)}),
                 _qp.execute_internal(
                         create_row_query_roles_valid(_authenticator_config.rest_authenticator_endpoint_ttl),
                         consistency_for_user(role_name),
-                        internal_distributed_timeout_config(),
+                        internal_distributed_query_state(),
                         {role_name})
         ).then([this, role_name, &roles](auto f) {
             return modify_membership(role_name, roles);
@@ -377,12 +377,12 @@ namespace auth {
                 _qp.execute_internal(
                         query,
                         consistency_for_user(role_name),
-                        internal_distributed_timeout_config(),
+                        internal_distributed_query_state(),
                         {passwords::hash(*options.password, rng_for_salt), role_name}),
                 _qp.execute_internal(
                         create_row_query_roles_valid(_authenticator_config.rest_authenticator_endpoint_ttl),
                         consistency_for_user(role_name),
-                        internal_distributed_timeout_config(),
+                        internal_distributed_query_state(),
                         {role_name})
         ).then([this, role_name, &roles](auto f) {
             return modify_membership(role_name, roles);
@@ -397,7 +397,7 @@ namespace auth {
 
         return _qp.execute_internal(
                 query, consistency_for_user(name),
-                internal_distributed_timeout_config(),
+                internal_distributed_query_state(),
                 {sstring(name)}).discard_result();
     }
 
@@ -413,7 +413,7 @@ namespace auth {
             return _qp.execute_internal(
                     query,
                     consistency_for_user(grantee_name),
-                    internal_distributed_timeout_config(),
+                    internal_distributed_query_state(),
                     {roles, grantee_name});
         };
 

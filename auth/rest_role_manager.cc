@@ -98,7 +98,7 @@ namespace auth {
                 return _qp.execute_internal(
                         query,
                         db::consistency_level::QUORUM,
-                        internal_distributed_timeout_config(),
+                        internal_distributed_query_state(),
                         {meta::DEFAULT_SUPERUSER_NAME}).then([](auto&&) {
                     log.info("Created default superuser role '{}'.", meta::DEFAULT_SUPERUSER_NAME);
                     return make_ready_future<>();
@@ -140,7 +140,7 @@ namespace auth {
         return qp.execute_internal(
                 query,
                 consistency_for_role(role_name),
-                internal_distributed_timeout_config(),
+                internal_distributed_query_state(),
                 {sstring(role_name)},
                 true).then([](::shared_ptr <cql3::untyped_result_set> results) {
             if (results->empty()) {
@@ -226,7 +226,7 @@ namespace auth {
         return _qp.execute_internal(
                 query,
                 consistency_for_role(role_name),
-                internal_distributed_timeout_config(),
+                internal_distributed_query_state(),
                 {sstring(role_name), c.is_superuser, c.can_login},
                 true).discard_result();
     }
@@ -267,7 +267,7 @@ namespace auth {
         return _qp.execute_internal(
                 query,
                 db::consistency_level::QUORUM,
-                internal_distributed_timeout_config()).then([](::shared_ptr <cql3::untyped_result_set> results) {
+                internal_distributed_query_state()).then([](::shared_ptr <cql3::untyped_result_set> results) {
             role_set roles;
 
             std::for_each(
