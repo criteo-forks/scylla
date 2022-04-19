@@ -63,30 +63,38 @@ namespace auth {
 
         virtual future<> stop() override;
 
-        virtual future<> create(std::string_view role_name, const role_config &) const override;
+        virtual future<> create(std::string_view role_name, const role_config &) override;
 
-        virtual future<> drop(std::string_view role_name) const override;
+        virtual future<> drop(std::string_view role_name) override;
 
-        virtual future<> alter(std::string_view role_name, const role_config_update &) const override;
+        virtual future<> alter(std::string_view role_name, const role_config_update &) override;
 
-        virtual future<> grant(std::string_view grantee_name, std::string_view role_name) const override;
+        virtual future<> grant(std::string_view grantee_name, std::string_view role_name) override;
 
-        virtual future<> revoke(std::string_view revokee_name, std::string_view role_name) const override;
+        virtual future<> revoke(std::string_view revokee_name, std::string_view role_name) override;
 
-        virtual future <role_set> query_granted(std::string_view grantee_name, recursive_role_query) const override;
+        virtual future <role_set> query_granted(std::string_view grantee_name, recursive_role_query) override;
 
-        virtual future <role_set> query_all() const override;
+        virtual future <role_set> query_all() override;
 
-        virtual future<bool> exists(std::string_view role_name) const override;
+        virtual future<bool> exists(std::string_view role_name) override;
 
-        virtual future<bool> is_superuser(std::string_view role_name) const override;
+        virtual future<bool> is_superuser(std::string_view role_name) override;
 
-        virtual future<bool> can_login(std::string_view role_name) const override;
+        virtual future<bool> can_login(std::string_view role_name) override;
 
+        virtual future<std::optional<sstring>> get_attribute(std::string_view role_name, std::string_view attribute_name) override;
+
+        virtual future<role_manager::attribute_vals> query_attribute_for_all(std::string_view attribute_name) override;
+
+        virtual future<> set_attribute(std::string_view role_name, std::string_view attribute_name, std::string_view attribute_value) override;
+
+        virtual future<> remove_attribute(std::string_view role_name, std::string_view attribute_name) override;
+        
     private:
         future<> create_metadata_tables_if_missing() const;
 
-        future<> create_or_replace(std::string_view role_name, const role_config &) const;
+        future<> create_or_replace(std::string_view role_name, const role_config &);
 
         future<> create_default_role_if_missing() const;
 
