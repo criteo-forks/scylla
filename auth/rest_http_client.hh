@@ -27,7 +27,7 @@
 #include "picojson/picojson.h"
 #include "auth/rest_response_parser.hh"
 #include "auth/role_manager.hh"
-#include "alternator/base64.hh"
+#include "utils/base64.hh"
 
 
 namespace auth {

@@ -43,6 +43,28 @@
 #include "database.hh"
 
 namespace auth {
+    namespace meta {
+        namespace role_attributes_table {
+            constexpr std::string_view name{"role_attributes", 15};
+
+            static std::string_view qualified_name() noexcept {
+                static const sstring instance = format("{}.{}", AUTH_KS, name);
+                return instance;
+            }
+            static std::string_view creation_query() noexcept {
+                static const sstring instance = format(
+                        "CREATE TABLE {} ("
+                        "  role text,"
+                        "  name text,"
+                        "  value text,"
+                        "  PRIMARY KEY(role, name)"
+                        ")",
+                        qualified_name());
+
+                return instance;
+            }
+        }
+    }
 
     static logging::logger log("rest_role_manager");
 
@@ -81,11 +103,17 @@ namespace auth {
     }
 
     future<> rest_role_manager::create_metadata_tables_if_missing() const {
-        return create_metadata_table_if_missing(
-                meta::roles_table::name,
-                _qp,
-                meta::roles_table::creation_query(),
-                _migration_manager).discard_result();
+        return when_all_succeed(
+            create_metadata_table_if_missing(
+                    meta::roles_table::name,
+                    _qp,
+                    meta::roles_table::creation_query(),
+                    _migration_manager),
+            create_metadata_table_if_missing(
+                    meta::role_attributes_table::name,
+                    _qp,
+                    meta::role_attributes_table::creation_query(),
+                    _migration_manager)).discard_result();
     }
 
     future<> rest_role_manager::create_default_role_if_missing() const {
@@ -181,7 +209,8 @@ namespace auth {
         });
     }
 
-    future <role_set> rest_role_manager::query_granted(std::string_view grantee_name, recursive_role_query m) const {
+
+    future <role_set> rest_role_manager::query_granted(std::string_view grantee_name, recursive_role_query m) {
         // Our implementation of roles does not support recursive role query
         return do_with(
                 role_set{sstring(grantee_name)},
@@ -190,7 +219,7 @@ namespace auth {
                 });
     }
 
-    future<bool> rest_role_manager::exists(std::string_view role_name) const {
+    future<bool> rest_role_manager::exists(std::string_view role_name) {
         // Used in grant revoke permissions to add permission if role exist
         // but we do not create role for groups so not checking if it exists
         // Also used after authentication to check if user has been well created
@@ -198,7 +227,7 @@ namespace auth {
         return make_ready_future<bool>(true);
     }
 
-    future<bool> rest_role_manager::is_superuser(std::string_view role_name) const {
+    future<bool> rest_role_manager::is_superuser(std::string_view role_name) {
         return find_record(_qp, role_name).then([](std::optional <record> mr) {
             if (mr) {
                 record r = *mr;
@@ -208,7 +237,7 @@ namespace auth {
         });
     }
 
-    future<bool> rest_role_manager::can_login(std::string_view role_name) const {
+    future<bool> rest_role_manager::can_login(std::string_view role_name) {
         return find_record(_qp, role_name).then([](std::optional <record> mr) {
             if (mr) {
                 record r = *mr;
@@ -219,7 +248,7 @@ namespace auth {
     }
 
     // Needed for unittest
-    future<> rest_role_manager::create_or_replace(std::string_view role_name, const role_config& c) const {
+    future<> rest_role_manager::create_or_replace(std::string_view role_name, const role_config& c) {
         static const sstring query = format("INSERT INTO {} ({}, is_superuser, can_login) VALUES (?, ?, ?)",
                                             meta::roles_table::qualified_name,
                                             meta::roles_table::role_col_name);
@@ -232,30 +261,83 @@ namespace auth {
     }
 
     // Needed for unittest
-    future<> rest_role_manager::create(std::string_view role_name, const role_config &c) const {
+    future<> rest_role_manager::create(std::string_view role_name, const role_config &c) {
         return this->create_or_replace(role_name, c);
     }
 
     future<>
-    rest_role_manager::alter(std::string_view role_name, const role_config_update &u) const {
+    rest_role_manager::alter(std::string_view role_name, const role_config_update &u) {
         // Role manager only managed update of can_login and is_superuser field
         // Those fields must not be managed by us but set by the rest authenticator when creating user
         return make_ready_future<>();
     }
 
-    future<> rest_role_manager::drop(std::string_view role_name) const {
+    future<> rest_role_manager::drop(std::string_view role_name) {
         throw std::logic_error("Not Implemented");
     }
 
-    future<> rest_role_manager::grant(std::string_view grantee_name, std::string_view role_name) const {
+    future<> rest_role_manager::grant(std::string_view grantee_name, std::string_view role_name) {
         throw std::logic_error("Not Implemented");
     }
 
-    future<> rest_role_manager::revoke(std::string_view revokee_name, std::string_view role_name) const {
+    future<> rest_role_manager::revoke(std::string_view revokee_name, std::string_view role_name) {
         throw std::logic_error("Not Implemented");
     }
 
-    future <role_set> rest_role_manager::query_all() const {
+    future<std::optional<sstring>> rest_role_manager::get_attribute(std::string_view role_name, std::string_view attribute_name) {
+        static const sstring query = format("SELECT name, value FROM {} WHERE role = ? AND name = ?", meta::role_attributes_table::qualified_name());
+        return _qp.execute_internal(query, {sstring(role_name), sstring(attribute_name)}).then([] (shared_ptr<cql3::untyped_result_set> result_set) {
+            if (!result_set->empty()) {
+                const cql3::untyped_result_set_row &row = result_set->one();
+                return std::optional<sstring>(row.get_as<sstring>("value"));
+            }
+            return std::optional<sstring>{};
+        });
+    }
+
+    future<role_manager::attribute_vals> rest_role_manager::query_attribute_for_all (std::string_view attribute_name) {
+        return query_all().then([this, attribute_name] (role_set roles) {
+            return do_with(attribute_vals{}, [this, attribute_name, roles = std::move(roles)] (attribute_vals &role_to_att_val) {
+                return parallel_for_each(roles.begin(), roles.end(), [this, &role_to_att_val, attribute_name] (sstring role) {
+                    return get_attribute(role, attribute_name).then([&role_to_att_val, role] (std::optional<sstring> att_val) {
+                        if (att_val) {
+                            role_to_att_val.emplace(std::move(role), std::move(*att_val));
+                        }
+                    });
+                }).then([&role_to_att_val] () {
+                    return make_ready_future<attribute_vals>(std::move(role_to_att_val));
+                });
+            });
+        });
+    }
+
+    future<> rest_role_manager::set_attribute(std::string_view role_name, std::string_view attribute_name, std::string_view attribute_value) {
+        static const sstring query = format("INSERT INTO {} (role, name, value)  VALUES (?, ?, ?)", meta::role_attributes_table::qualified_name());
+        return do_with(sstring(role_name), sstring(attribute_name), sstring(attribute_value), [this] (sstring& role_name, sstring &attribute_name,
+                sstring &attribute_value) {
+            return exists(role_name).then([&role_name, &attribute_name, &attribute_value, this] (bool role_exists) {
+                if (!role_exists) {
+                    throw auth::nonexistant_role(role_name);
+                }
+                return _qp.execute_internal(query, {sstring(role_name), sstring(attribute_name), sstring(attribute_value)}).discard_result();
+            });
+        });
+
+    }
+
+    future<> rest_role_manager::remove_attribute(std::string_view role_name, std::string_view attribute_name) {
+        static const sstring query = format("DELETE FROM {} WHERE role = ? AND name = ?", meta::role_attributes_table::qualified_name());
+        return do_with(sstring(role_name), sstring(attribute_name), [this] (sstring& role_name, sstring &attribute_name) {
+            return exists(role_name).then([&role_name, &attribute_name, this] (bool role_exists) {
+                if (!role_exists) {
+                    throw auth::nonexistant_role(role_name);
+                }
+                return _qp.execute_internal(query, {sstring(role_name), sstring(attribute_name)}).discard_result();
+            });
+        });
+    }
+
+    future<role_set> rest_role_manager::query_all() {
         static const sstring query = format("SELECT {},member_of from {}",
                                             meta::roles_table::role_col_name,
                                             meta::roles_table::qualified_name);
