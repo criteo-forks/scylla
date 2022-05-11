@@ -1841,11 +1841,13 @@ void gossiper::examine_gossiper(utils::chunked_vector<gossip_digest>& g_digest_l
 }
 
 future<> gossiper::start_gossiping(int generation_nbr, std::map<application_state, versioned_value> preload_local_states, gms::advertise_myself advertise) {
-    return container().invoke_on_all([advertise] (gossiper& g) {
-        if (!advertise) {
-            g._advertise_myself = false;
-        }
-    }).then([this, generation_nbr, preload_local_states] () mutable {
+    return seastar::async([this, g = this->shared_from_this(), generation_nbr, preload_local_states, advertise] () mutable {
+        container().invoke_on_all([advertise] (gossiper& g) {
+            if (!advertise) {
+                g._advertise_myself = false;
+            }
+        }).get();
+    
         build_seeds_list();
         if (_cfg.force_gossip_generation() > 0) {
             generation_nbr = _cfg.force_gossip_generation();
@@ -1860,19 +1862,24 @@ future<> gossiper::start_gossiping(int generation_nbr, std::map<application_stat
 
         auto generation = local_state.get_heart_beat_state().get_generation();
 
-        return replicate(get_broadcast_address(), local_state).then([] {
+        replicate(get_broadcast_address(), local_state).then([] {
             //notify snitches that Gossiper is about to start
             return locator::i_endpoint_snitch::get_local_snitch_ptr()->gossiper_starting();
-        }).then([this, generation] {
-            logger.trace("gossip started with generation {}", generation);
-            _enabled = true;
-            _nr_run = 0;
-            _scheduled_gossip_task.arm(INTERVAL);
-            return container().invoke_on_all([] (gms::gossiper& g) {
-                g._enabled = true;
-                g._failure_detector_loop_done = g.failure_detector_loop();
-            });
-        });
+        }).get();
+        
+        logger.trace("gossip started with generation {}", generation);
+        _enabled = true;
+        _nr_run = 0;
+        _background_msg = seastar::gate();
+        _scheduled_gossip_task.arm(INTERVAL);
+        container().invoke_on_all([] (gms::gossiper& g) {
+            logger.debug("failure_detector_loop: gossip is enabled");
+            g._enabled = true;
+        }).get();
+        // Dispatch failure_detector_loop only on shard 0 as the loop won't execute on any other shards
+        container().invoke_on(0, [] (gms::gossiper& g) {
+            g._failure_detector_loop_done = g.failure_detector_loop();
+        }).get();
     });
 }
 
