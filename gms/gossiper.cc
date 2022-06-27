@@ -255,6 +255,25 @@ private:
     std::unique_ptr<uint64_t, void(*)(uint64_t*)> _ptr;
 };
 
+static bool should_count_as_msg_processing(const std::map<inet_address, endpoint_state>& map) {
+    bool count_as_msg_processing  = false;
+    for (auto& x : map) {
+        auto& state = x.second;
+        for (const auto& entry : state.get_application_state_map()) {
+            auto& app_state = entry.first;
+            if (!(app_state == application_state::LOAD ||
+                  app_state == application_state::VIEW_BACKLOG ||
+                  app_state == application_state::CACHE_HITRATES)) {
+                count_as_msg_processing = true;
+                logger.debug("node={}, app_state={}, count_as_msg_processing={}",
+                        x.first, app_state, count_as_msg_processing);
+                return count_as_msg_processing;
+            }
+        }
+    }
+    return count_as_msg_processing;
+}
+
 // Depends on
 // - failure_detector
 // - on_change callbacks, e.g., storage_service -> access db system_table
@@ -268,18 +287,24 @@ future<> gossiper::handle_ack_msg(msg_addr id, gossip_digest_ack ack_msg) {
         return make_ready_future<>();
     }
 
-    msg_proc_guard mp(*this);
-
     auto g_digest_list = ack_msg.get_gossip_digest_list();
     auto& ep_state_map = ack_msg.get_endpoint_state_map();
+
+    bool count_as_msg_processing = should_count_as_msg_processing(ep_state_map);
+    if (count_as_msg_processing) {
+        _msg_processing++;
+    }
+    auto mp = defer([count_as_msg_processing, this] {
+        if (count_as_msg_processing) {
+            _msg_processing--;
+        }
+    });
 
     auto f = make_ready_future<>();
     if (ep_state_map.size() > 0) {
         update_timestamp_for_nodes(ep_state_map);
         f = this->apply_state_locally(std::move(ep_state_map));
     }
-
-    assert(_msg_processing > 0);
 
     return f.then([this, from = id, ack_msg_digest = std::move(g_digest_list), mp = std::move(mp), g = this->shared_from_this()] () mutable {
         if (this->is_in_shadow_round()) {
@@ -364,10 +389,19 @@ future<> gossiper::handle_ack2_msg(msg_addr from, gossip_digest_ack2 msg) {
         return make_ready_future<>();
     }
 
-    msg_proc_guard mp(*this);
-
     auto& remote_ep_state_map = msg.get_endpoint_state_map();
     update_timestamp_for_nodes(remote_ep_state_map);
+
+    bool count_as_msg_processing = should_count_as_msg_processing(remote_ep_state_map);
+    if (count_as_msg_processing) {
+        _msg_processing++;
+    }
+    auto mp = defer([count_as_msg_processing, this] {
+        if (count_as_msg_processing) {
+            _msg_processing--;
+        }
+    });
+
     return apply_state_locally(std::move(remote_ep_state_map)).finally([mp = std::move(mp)] {});
 }
 
