@@ -40,7 +40,7 @@
 #include "exceptions/exceptions.hh"
 #include "log.hh"
 #include "utils/class_registrator.hh"
-#include "database.hh"
+#include "replica/database.hh"
 
 namespace auth {
     namespace meta {
@@ -145,7 +145,7 @@ namespace auth {
             return this->create_metadata_tables_if_missing().then([this] {
                 _stopped = auth::do_after_system_ready(_as, [this] {
                     return seastar::async([this] {
-                        wait_for_schema_agreement(_migration_manager, _qp.db(), _as).get0();
+                        wait_for_schema_agreement(_migration_manager, _qp.db().real_database(), _as).get0();
 
                         create_default_role_if_missing().get0();
                     });
