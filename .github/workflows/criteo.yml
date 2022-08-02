@@ -2,7 +2,7 @@ name: buildscylla
 
 on:
   release:
-    types: [published, edited, created]
+    types: [published]
 
 env:
   BUILD_TYPE: Release
