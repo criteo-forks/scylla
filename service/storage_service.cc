@@ -1349,12 +1349,14 @@ future<> storage_service::replicate_to_all_cores(mutable_token_metadata_ptr tmpt
     pending_effective_replication_maps.resize(smp::count);
 
     try {
+        slogger.debug("Replicating token_metadata to all cores: start");
         auto base_shard = this_shard_id();
         pending_token_metadata_ptr[base_shard] = tmptr;
         // clone a local copy of updated token_metadata on all other shards
         co_await smp::invoke_on_others(base_shard, [&, base_shard, tmptr] () -> future<> {
             pending_token_metadata_ptr[this_shard_id()] = make_token_metadata_ptr(co_await tmptr->clone_async());
         });
+        slogger.debug("Replicating token_metadata to all cores: Precalculate");
 
         // Precalculate new effective_replication_map for all keyspaces
         // and clone to all shards;
@@ -1370,6 +1372,7 @@ future<> storage_service::replicate_to_all_cores(mutable_token_metadata_ptr tmpt
             pending_effective_replication_maps[base_shard].emplace(ks_name, std::move(erm));
         }
         co_await container().invoke_on_others([&, base_shard] (storage_service& ss) -> future<> {
+            slogger.debug("Replicating token_metadata to all cores: create_effective_replication_map start");
             auto& db = ss._db.local();
             for (auto& ks_name : keyspaces) {
                 auto rs = db.find_keyspace(ks_name).get_replication_strategy_ptr();
@@ -1378,11 +1381,13 @@ future<> storage_service::replicate_to_all_cores(mutable_token_metadata_ptr tmpt
                 pending_effective_replication_maps[this_shard_id()].emplace(ks_name, std::move(erm));
 
             }
+            slogger.debug("Replicating token_metadata to all cores: create_effective_replication_map done");
         });
     } catch (...) {
         ex = std::current_exception();
     }
 
+    slogger.debug("Replicating token_metadata to all cores: rollback?");
     // Rollback on metadata replication error
     if (ex) {
         try {
@@ -1399,12 +1404,12 @@ future<> storage_service::replicate_to_all_cores(mutable_token_metadata_ptr tmpt
 
         std::rethrow_exception(std::move(ex));
     }
-
+    slogger.debug("Replicating token_metadata to all cores: apply changes on all shards");
     // Apply changes on all shards
     try {
         co_await container().invoke_on_all([&] (storage_service& ss) {
             ss._shared_token_metadata.set(std::move(pending_token_metadata_ptr[this_shard_id()]));
-
+            slogger.debug("Replicating token_metadata to all cores: update_effective_replication_map: start");
             auto& erms = pending_effective_replication_maps[this_shard_id()];
             for (auto it = erms.begin(); it != erms.end(); ) {
                 auto& db = ss._db.local();
@@ -1412,6 +1417,7 @@ future<> storage_service::replicate_to_all_cores(mutable_token_metadata_ptr tmpt
                 ks.update_effective_replication_map(std::move(it->second));
                 it = erms.erase(it);
             }
+            slogger.debug("Replicating token_metadata to all cores: update_effective_replication_map: done");
         });
     } catch (...) {
         // applying the changes on all shards should never fail
@@ -1419,6 +1425,7 @@ future<> storage_service::replicate_to_all_cores(mutable_token_metadata_ptr tmpt
         slogger.error("Failed to apply token_metadata changes: {}. Aborting.", std::current_exception());
         abort();
     }
+    slogger.debug("Replicating token_metadata to all cores: done");
 }
 
 future<> storage_service::stop() {
