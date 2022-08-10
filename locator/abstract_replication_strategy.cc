@@ -318,8 +318,15 @@ abstract_replication_strategy::get_pending_address_ranges(const token_metadata_p
 future<mutable_effective_replication_map_ptr> calculate_effective_replication_map(abstract_replication_strategy::ptr_type rs, token_metadata_ptr tmptr) {
     replication_map replication_map;
 
-    for (const auto &t : tmptr->sorted_tokens()) {
-        replication_map.emplace(t, co_await rs->calculate_natural_endpoints(t, *tmptr));
+    if (rs->get_type() == replication_strategy_type::everywhere_topology) {
+        auto ne = co_await rs->calculate_natural_endpoints(tmptr->sorted_tokens().front(), *tmptr);
+        for (const auto &t : tmptr->sorted_tokens()) {
+            replication_map.emplace(t, ne);
+        }
+    } else {
+        for (const auto &t : tmptr->sorted_tokens()) {
+            replication_map.emplace(t, co_await rs->calculate_natural_endpoints(t, *tmptr));
+        }
     }
 
     auto rf = rs->get_replication_factor(*tmptr);
