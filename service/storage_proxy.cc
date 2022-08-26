@@ -4323,7 +4323,9 @@ storage_proxy::query_partition_key_range(lw_shared_ptr<query::read_command> cmd,
 
     // when dealing with LocalStrategy keyspaces, we can skip the range splitting and merging (which can be
     // expensive in clusters with vnodes)
-    query_ranges_to_vnodes_generator ranges_to_vnodes(get_token_metadata_ptr(), schema, std::move(partition_ranges), ks.get_replication_strategy().get_type() == locator::replication_strategy_type::local);
+    auto merge_tokens = ks.get_replication_strategy().get_type() == locator::replication_strategy_type::local || ks.get_replication_strategy().get_type() == locator::replication_strategy_type::everywhere_topology;
+
+    query_ranges_to_vnodes_generator ranges_to_vnodes(get_token_metadata_ptr(), schema, std::move(partition_ranges), merge_tokens);
 
     int result_rows_per_range = 0;
     int concurrency_factor = 1;
