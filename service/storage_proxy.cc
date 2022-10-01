@@ -1339,7 +1339,8 @@ query::max_result_size storage_proxy::get_max_result_size(const query::partition
 }
 
 bool storage_proxy::need_throttle_writes() const {
-    return get_global_stats().background_write_bytes > _background_write_throttle_threahsold || get_global_stats().queued_write_bytes > 6*1024*1024;
+    return false;
+    // return get_global_stats().background_write_bytes > _background_write_throttle_threahsold || get_global_stats().queued_write_bytes > 6*1024*1024;
 }
 
 void storage_proxy::unthrottle() {
