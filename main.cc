@@ -966,6 +966,7 @@ To start the scylla server proper, simply invoke as: scylla server (or just scyl
                 plain_constructor(ptr);
                 reinterpret_cast<service::storage_proxy_stats::stats*>(ptr)->register_stats();
                 reinterpret_cast<service::storage_proxy_stats::stats*>(ptr)->register_split_metrics_local();
+                reinterpret_cast<service::storage_proxy_stats::global_stats*>(ptr)->register_stats();
             };
             proxy.start(std::ref(db), std::ref(gossiper), spcfg, std::ref(node_backlog),
                     scheduling_group_key_create(storage_proxy_stats_cfg).get0(),

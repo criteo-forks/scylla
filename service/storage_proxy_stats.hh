@@ -214,6 +214,7 @@ struct global_write_stats {
  *  Following the convention of stats and write_stats
  */
 struct global_stats : public global_write_stats {
+public:
     void register_stats();
 };
 
