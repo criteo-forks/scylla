@@ -7,6 +7,10 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
+/*
+ * Modified by Criteo: June 2021
+ */
+
 #include <unordered_map>
 #include <sstream>
 
@@ -844,8 +848,9 @@ db::config::config(std::shared_ptr<db::extensions> exts)
         "\torg.apache.cassandra.auth.PasswordAuthenticator : Authenticates users with user names and hashed passwords stored in the system_auth.credentials table. If you use the default, 1, and the node with the lone replica goes down, you will not be able to log into the cluster because the system_auth keyspace was not replicated.\n"
         "\tcom.scylladb.auth.CertificateAuthenticator : Authenticates users based on TLS certificate authentication subject. Roles and permissions still need to be defined as normal. Super user can be set using the 'auth_superuser_name' configuration value. Query to extract role name from subject string is set using 'auth_certificate_role_queries'.\n"
         "\tcom.scylladb.auth.TransitionalAuthenticator : Wraps around the PasswordAuthenticator, logging them in if username/password pair provided is correct and treating them as anonymous users otherwise.\n"
+        "\tcom.criteo.scylladb.auth.RestAuthenticator : Call an external rest endpoints to authenticate user.\n"
         "Related information: Internal authentication"
-        , {"AllowAllAuthenticator", "PasswordAuthenticator", "CertificateAuthenticator", "org.apache.cassandra.auth.PasswordAuthenticator", "org.apache.cassandra.auth.AllowAllAuthenticator", "com.scylladb.auth.TransitionalAuthenticator", "com.scylladb.auth.CertificateAuthenticator"})
+        , {"AllowAllAuthenticator", "PasswordAuthenticator", "CertificateAuthenticator", "org.apache.cassandra.auth.PasswordAuthenticator", "org.apache.cassandra.auth.AllowAllAuthenticator", "com.scylladb.auth.TransitionalAuthenticator", "com.scylladb.auth.CertificateAuthenticator", "com.criteo.scylladb.auth.RestAuthenticator"})
     , internode_authenticator(this, "internode_authenticator", value_status::Unused, "enabled",
         "Internode authentication backend. It implements org.apache.cassandra.auth.AllowAllInternodeAuthenticator to allows or disallow connections from peer nodes.")
     , authorizer(this, "authorizer", value_status::Used, "org.apache.cassandra.auth.AllowAllAuthorizer",
@@ -1105,7 +1110,16 @@ db::config::config(std::shared_ptr<db::extensions> exts)
     , minimum_replication_factor_warn_threshold(this, "minimum_replication_factor_warn_threshold", liveness::LiveUpdate, value_status::Used,  3, "")
     , maximum_replication_factor_warn_threshold(this, "maximum_replication_factor_warn_threshold", liveness::LiveUpdate, value_status::Used, -1, "")
     , maximum_replication_factor_fail_threshold(this, "maximum_replication_factor_fail_threshold", liveness::LiveUpdate, value_status::Used, -1, "")
+
+    // REST AUTHENTICATOR
+    , rest_authenticator_endpoint_host(this, "rest_authenticator_endpoint_host", value_status::Used, "localhost", "Host to contact the external rest endpoint used to authenticate users.")
+    , rest_authenticator_endpoint_port(this, "rest_authenticator_endpoint_port", value_status::Used, 443, "Port to contact the external rest endpoint used to authenticate users.")
+    , rest_authenticator_endpoint_cafile_path(this, "rest_authenticator_endpoint_cafile_path", value_status::Used, "", "Path to the file containing the CA to trust to contact the external authenticator rest endpoint.")
+    , rest_authenticator_endpoint_ttl(this, "rest_authenticator_endpoint_ttl", value_status::Used, 86400, "TTL used to define how many time user roles from rest endpoint authenticator should be kept.")
+    , rest_authenticator_endpoint_timeout(this, "rest_authenticator_endpoint_timeout", value_status::Used, 5, "Duration (in second) before to timeout when calling rest auth endpoint.")
+
     , error_injections_at_startup(this, "error_injections_at_startup", error_injection_value_status, {}, "List of error injections that should be enabled on startup.")
+
     , default_log_level(this, "default_log_level", value_status::Used)
     , logger_log_level(this, "logger_log_level", value_status::Used)
     , log_to_stdout(this, "log_to_stdout", value_status::Used)
