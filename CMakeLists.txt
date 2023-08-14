@@ -305,6 +305,8 @@ set(scylla_sources
     auth/common.cc
     auth/default_authorizer.cc
     auth/password_authenticator.cc
+    auth/rest_authenticator.cc
+    auth/rest_role_manager.cc
     auth/passwords.cc
     auth/permission.cc
     auth/permissions_cache.cc
