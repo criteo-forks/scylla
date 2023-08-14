@@ -15,6 +15,8 @@ target_sources(scylla_auth
     permission.cc
     permissions_cache.cc
     resource.cc
+    rest_authenticator.cc
+    rest_role_manager.cc
     role_or_anonymous.cc
     roles-metadata.cc
     sasl_challenge.cc
