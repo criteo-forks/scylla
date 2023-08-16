@@ -28,7 +28,7 @@ from cassandra.auth import PlainTextAuthProvider
 def contact_scylla(username='scylla_user', password='not_cassandra'):
     print(f'Run with user {username}')
     auth_provider = PlainTextAuthProvider(username=username, password=password)
-    cluster = Cluster(auth_provider=auth_provider, protocol_version=2)
+    cluster = Cluster(auth_provider=auth_provider, protocol_version=3)
     session = cluster.connect()
     try:
         print('roles')

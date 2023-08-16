@@ -20,11 +20,9 @@
 # You should have received a copy of the GNU General Public License
 # along with Scylla.  If not, see <http://www.gnu.org/licenses/>.
 #
-
-deactivate
 python3 -m venv --clear venv
 source venv/bin/activate
 pip3 install -r requirements.txt
 
 echo "Start Rest Api Serevr"
-uvicorn main:app --reload --port 8000 --ssl-keyfile certs/rest_api.key --ssl-certfile certs/rest_api.crt 
+uvicorn main:app --reload --port 8000 --ssl-keyfile certs/rest_api.key --ssl-certfile certs/rest_api.crt
