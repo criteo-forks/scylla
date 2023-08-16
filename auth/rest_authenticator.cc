@@ -232,11 +232,6 @@ future<role_set> get_user_roles(sstring username, sstring password, const authen
     socket_address sa(ip, conf.rest_authenticator_endpoint_port);
     auto fd = co_await tls::connect(certs, sa, conf.rest_authenticator_endpoint_host);
 
-    // in & out aren't really required here (they are managed by connection object),
-    // we get them only to mitigate wrong exception management in connection::close().
-    // problem visible with expired_tls_certs unit test,
-    auto in = fd.input();
-    auto out = fd.output();
     connection http_client(std::move(fd));
 
     auto req = request::make("GET", conf.rest_authenticator_endpoint_host, "/api/v1/auth/user/groups");
@@ -250,23 +245,25 @@ future<role_set> get_user_roles(sstring username, sstring password, const authen
     sstring content;
     try {
         rep = co_await http_client.make_request(std::move(req));
+        ralogger.debug("rest_authenticator response for user {} status={}", username, rep._status);
+
         if (rep._status == reply::status_type::ok) {
+            ralogger.debug("rest_authenticator response for user {} content_length={}", username, rep.content_length);
+
             content = to_sstring(co_await http_client.in(rep).read_exactly(rep.content_length));
+            ralogger.debug("rest_authenticator response for user {} body={}", username, content);
         }
     } catch(...) {
         ep = std::current_exception();
         ralogger.warn("failure to invoke rest auth api: {}", ep);
     }
 
-    // manually close in and out to close underlying TLS session and socket
-    co_await in.close().handle_exception([](auto ep){ ralogger.warn("failure to close http_client in stream: {}", ep); });
-    co_await out.close().handle_exception([](auto ep){ ralogger.warn("failure to close http_client out stream: {}", ep); });
-    // try {
-    //     co_await http_client.close();
-    // } catch(...) {
-    //     auto ex = std::current_exception();
-    //     ralogger.warn("failure to close http_client: {}", ex);
-    // }
+    try {
+        co_await http_client.close();
+    } catch(...) {
+        auto ex = std::current_exception();
+        ralogger.warn("failure to close http_client: {}", ex);
+    }
 
     if (ep) {
         std::rethrow_exception(ep);
@@ -275,17 +272,21 @@ future<role_set> get_user_roles(sstring username, sstring password, const authen
     switch (rep._status)
     {
         case reply::status_type::ok: {
+            if (content == "") {
+                throw exceptions::authentication_exception("Empty response from rest authenticator");
+            }
+
             rjson::value json = rjson::parse(std::move(content));
             if (!json.IsObject()) {
-                throw exceptions::authentication_exception("Bad response: response is not a dict");
+                throw exceptions::authentication_exception("Bad response from rest authenticator, json object expected");
             }
 
             const rjson::value* groups_json = rjson::find(json, "groups");
             if (!groups_json) {
-                throw exceptions::authentication_exception("Bad response: doesn't contain groups field");
+                throw exceptions::authentication_exception("Bad response from rest authenticator, groups field expected");
             }
             if (!groups_json->IsArray()) {
-                throw exceptions::authentication_exception("Bad response: groups field doesn't contain an array");
+                throw exceptions::authentication_exception("Bad response from rest authenticator, groups field expected to be an arry");
             }
 
             role_set groups;
@@ -308,7 +309,7 @@ future<role_set> get_user_roles(sstring username, sstring password, const authen
             break;
 
         default:
-            throw exceptions::authentication_exception(format("Issue to authenticate with http status code {}", rep._status));
+            throw exceptions::authentication_exception(format("Bad response from rest authenticator: {}", rep._status));
     }
 }
 
@@ -397,8 +398,8 @@ future<authenticated_user> rest_authenticator::authenticate(
                 std::rethrow_exception(ep);
             } catch (std::system_error&) {
                 std::throw_with_nested(exceptions::authentication_exception("Could not verify password"));
-            } catch (exceptions::authentication_exception& e) {
-                std::throw_with_nested(e);
+            } catch (exceptions::authentication_exception&) {
+                throw;
             } catch (std::exception& e) {
                 std::throw_with_nested(exceptions::authentication_exception(e.what()));
             } catch (...) {

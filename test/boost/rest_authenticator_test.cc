@@ -37,7 +37,7 @@ using namespace seastar::testing;
 //
 // Notes:
 // to execute test suite, run ./tools/toolchain/dbuild ./test.py --no-parallel-cases --mode debug rest_authenticator
-// to execute a specific test case, run /tools/toolchain/dbuild build/debug/test/boost/rest_authenticator_test --run_test=<test_case>
+// to execute a specific test case, run ./tools/toolchain/dbuild build/debug/test/boost/rest_authenticator_test --run_test=<test_case>
 //
 
 cql_test_config rest_authenticator_on(int port, bool use_outdated_certs) {

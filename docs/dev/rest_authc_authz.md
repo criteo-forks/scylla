@@ -62,12 +62,14 @@ $ ./tools/toolchain/dbuild ./build/release/scylla --workdir tmp --smp 2 --devel
 Run FastAPI rest server
 
 ```bash
-$ ./tools/rest_authenticator_server/rest_server.sh
+$ cd tools/rest_authenticator_server
+$ ./rest_server.sh
 ```
 
 Run Test client
 
 ```bash
+$ cd tools/rest_authenticator_server
 $ ./tools/rest_authenticator_server/scylla_client.sh
 ```
 
