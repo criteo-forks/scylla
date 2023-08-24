@@ -1,6 +1,8 @@
 [submodule "seastar"]
 	path = seastar
-	url = https://github.com/scylladb/scylla-seastar
+	branch = scylla-seastar-5.2.14-criteo
+	url = https://github.com/criteo-forks/scylla-seastar
+	pushurl = git@github.com:criteo-forks/scylla-seastar.git
 	ignore = dirty
 [submodule "swagger-ui"]
 	path = swagger-ui
