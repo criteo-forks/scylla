@@ -62,8 +62,8 @@ namespace roles_valid_table {
 }
 }
 
-constexpr std::string_view
-rest_authenticator_name("com.criteo.scylladb.auth.RestAuthenticator");
+constexpr std::string_view cassandra_authenticator_name("org.apache.cassandra.auth.PasswordAuthenticator");
+constexpr std::string_view rest_authenticator_name("com.criteo.scylladb.auth.RestAuthenticator");
 
 // name of the hash column.
 static constexpr std::string_view SALTED_HASH = "salted_hash";
@@ -208,7 +208,7 @@ db::consistency_level rest_authenticator::consistency_for_user(std::string_view 
 }
 
 std::string_view rest_authenticator::qualified_java_name() const {
-    return rest_authenticator_name;
+    return cassandra_authenticator_name;
 }
 
 bool rest_authenticator::require_authentication() const {

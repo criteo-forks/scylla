@@ -255,7 +255,7 @@ static future<> create_superuser_role(cql3::query_processor &qp) {
 SEASTAR_TEST_CASE(rest_authenticator_conf) {
     return with_dummy_authentication_server([] (cql_test_env &env) {
         auto &a = env.local_auth_service().underlying_authenticator();
-        BOOST_REQUIRE_EQUAL(a.qualified_java_name(), "com.criteo.scylladb.auth.RestAuthenticator");
+        BOOST_REQUIRE_EQUAL(a.qualified_java_name(), "org.apache.cassandra.auth.PasswordAuthenticator");
         BOOST_REQUIRE(a.require_authentication());
 
         auto &authenticator_config = a.get_authenticator_config();
