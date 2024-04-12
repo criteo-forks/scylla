@@ -170,6 +170,9 @@ future<> view_update_generator::start() {
                     // Need to add sstables back to the set so we can retry later. By now it may
                     // have had other updates.
                     std::move(sstables.begin(), sstables.end(), std::back_inserter(_sstables_with_tables[t]));
+                    // See https://github.com/scylladb/scylladb/issues/18222
+                    // Sleep a bit, to avoid a tight loop repeatedly spamming the log with the same message.
+                    seastar::sleep(std::chrono::seconds(1)).get();
                     break;
                 }
                 try {
